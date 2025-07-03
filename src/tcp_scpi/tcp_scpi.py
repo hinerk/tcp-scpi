@@ -56,7 +56,7 @@ class SCPIClient:
         self.connect()
         return self
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         """
         Automatically closes the connection on context manager exit.
         """
