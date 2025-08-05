@@ -118,40 +118,39 @@ class SCPIClient:
         self._send(command)
         return self._receive()
 
-    def send(self, command: str):
+    def send(self, command: str, fetch_errors: bool = True):
         """
         Send a command to the instrument and check for SCPI errors.
 
         :param command: SCPI command string.
+        :param fetch_errors: Whether to fetch errors after sending.
         :raises SCPIError: If the instrument reports any errors.
         """
-        self._send(command)
-        if errors := self._read_errors():
-            errors = ", ".join(errors)
-            raise SCPIError(f"sending {repr(command)} failed with: {errors}")
+        if fetch_errors:
+            self.query(command)
+        else:
+            self._send(command)
 
-    def receive(self):
-        """
-        Receive data from the instrument.
-
-        :return: Response string from the instrument.
-        """
-        return self._receive()
-
-    def query(self, command: str):
+    def query(self, command: str, fetch_errors: bool = True):
         """
         Send a query command to the instrument and return the response,
         with SCPI error checking.
 
         :param command: SCPI command string.
+        :param fetch_errors: Whether to fetch errors after issuing a query.
         :return: Response string from the instrument.
         :raises SCPIError: If the instrument reports any errors.
         """
-        response = self._query(command)
-        if errors := self._read_errors():
-            errors = ", ".join(errors)
-            raise SCPIError(f"querying {repr(command)} failed with: {errors}")
-        return response
+        if not fetch_errors:
+            return self._query(command)
+
+        *response, error = self._query(
+            f"{command};{self._error_cmd}").rsplit(";", maxsplit=1)
+        if error == self._no_error_msg:
+            return response[0] if response else ""
+
+        errors = ", ".join([error, *self._read_errors()])
+        raise SCPIError(f"querying {repr(command)} failed with: {errors}")
 
     def close(self):
         """
