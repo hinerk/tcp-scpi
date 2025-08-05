@@ -23,7 +23,7 @@ class SCPIClient:
         host: str,
         port: int = 5025,
         timeout: float = 0.5,
-        newline: str = '\n',
+        command_termination: bytes = b'\n',
         error_cmd: str = ":SYSTem:ERRor?",
         no_error_msg: str = '0,"No error"',
     ):
@@ -33,7 +33,7 @@ class SCPIClient:
         :param host: URL of the SCPI device.
         :param port: TCP port to connect to (default: 5025).
         :param timeout: Socket timeout in seconds (default: 0.5).
-        :param newline: Character used to terminate SCPI commands
+        :param command_termination: Character used to terminate SCPI commands
         (default: '\\n').
         :param error_cmd: SCPI command used to query errors
         (default: ':SYSTem:ERRor?').
@@ -44,7 +44,7 @@ class SCPIClient:
         self._port = port
         self._timeout = timeout
         self._sock: socket.socket | None = None
-        self._newline = newline
+        self._command_termination = command_termination
         self._error_cmd = error_cmd
         self._no_error_msg = no_error_msg
 
@@ -65,7 +65,7 @@ class SCPIClient:
     def __repr__(self):
         return (f'{self.__class__.__name__}(ip={repr(self._host)}, '
                 f'port={repr(self._port)}, timeout={repr(self._timeout)}, '
-                f'newline={repr(self._newline)})')
+                f'command_termination={repr(self._command_termination)})')
 
     def connect(self):
         """
@@ -95,8 +95,14 @@ class SCPIClient:
         :param buf_size: Maximum number of bytes to read (default: 4096).
         :return: Decoded response string (whitespace stripped).
         """
-        received = self._sock.recv(buf_size)
-        logger.debug(f"received {repr(received)}")
+        received = b""
+        while True:
+            chunk = self._sock.recv(buf_size)
+            received += chunk
+            logger.debug(f'received chunk {chunk!r}')
+            if chunk[-1:] == self._command_termination:
+                break
+        logger.debug(f"received {received!r}")
         return received.decode().strip()
 
     def _query(self, command: str):
